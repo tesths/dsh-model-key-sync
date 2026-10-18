@@ -79,10 +79,12 @@ const EFFORT_KEYS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
 
 /**
  * Provider fields this page owns: they are copied to and from a snapshot.
- * Every other field of a live profile (retry policy, image limits, timeouts,
- * compat switches, transport…) is preserved untouched on restore.
+ * ROUTE_FIELDS are rebuilt from the record; PROVIDER_FIELDS travel when the
+ * record carries them. Every other field of a live profile (retry policy, image
+ * limits, timeouts, compat switches, transport…) is preserved untouched.
  */
-const OWNED_FIELDS = ['displayName', 'api', 'baseURL', 'models', 'apiKeyEnv', 'defaultContextWindow', 'defaultMaxTokens', 'defaultInput', 'reasoning', 'cacheRetention', 'thinkingBudgets']
+const ROUTE_FIELDS = ['displayName', 'api', 'baseURL', 'models', 'apiKeyEnv']
+const PROVIDER_FIELDS = ['defaultContextWindow', 'defaultMaxTokens', 'defaultInput', 'reasoning', 'cacheRetention', 'thinkingBudgets']
 
 /** Per-model fields the page copies; anything else on a model row is dropped. */
 const MODEL_FIELDS = ['id', 'name', 'contextWindow', 'maxTokens', 'input', 'reasoningEfforts', 'compat']
@@ -332,7 +334,7 @@ function modelsOf(models, route) {
 function profileOf(current, incoming) {
   const route = requiredString(incoming.provider, 'provider')
   const base = isRecord(current) ? clone(current) : {}
-  for (const field of OWNED_FIELDS) delete base[field]
+  for (const field of ROUTE_FIELDS) delete base[field]
   const profile = { ...base }
   profile.displayName = typeof incoming.displayName === 'string' && incoming.displayName.trim().length > 0
     ? incoming.displayName.trim()
@@ -343,6 +345,11 @@ function profileOf(current, incoming) {
   }
   profile.baseURL = requiredURL(incoming.baseURL, `provider "${route}" baseURL`)
   profile.models = modelsOf(incoming.models, route)
+  // Provider-level values travel with the route. A record that predates them
+  // leaves the current values in place instead of deleting them.
+  for (const field of PROVIDER_FIELDS) {
+    if (incoming[field] !== undefined) profile[field] = clone(incoming[field])
+  }
   // The credential is carried by reference only. An explicit name wins; an
   // existing reference on the route is kept as-is; otherwise derive the name
   // the Models page derives for a new provider.
@@ -384,7 +391,7 @@ function recordOf(route, profile, includeHeaders) {
   record.apiKeyEnv = typeof profile.apiKeyEnv === 'string' && profile.apiKeyEnv.length > 0
     ? profile.apiKeyEnv
     : derivedKeyRef(route)
-  for (const field of ['defaultContextWindow', 'defaultMaxTokens', 'defaultInput', 'reasoning', 'cacheRetention', 'thinkingBudgets']) {
+  for (const field of PROVIDER_FIELDS) {
     if (profile[field] !== undefined) record[field] = clone(profile[field])
   }
   if (includeHeaders && isRecord(profile.headers)) {

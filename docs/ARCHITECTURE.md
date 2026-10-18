@@ -4,7 +4,7 @@ Two halves, one service, four files that matter.
 
 ```
 index.js              Host: Config schema, ModelSyncService, the agent tool, the command channel
-client.js             Client: two settings tabs, rendered from the settings mirror
+client.js             Client: one cloud-sync page plus a read-only local summary
 cloud/snapshot.js     Snapshot format: manifest, per-route objects, credentials object
 cloud/sync.js         Transfer: push/pull, conflict rules, snapshot identity
 cloud/transport.js    S3 SigV4 and WebDAV transports, timeouts, size caps
@@ -48,6 +48,11 @@ re-render from the mirror
 Why a command field rather than a Remote call: see the constraint above. Why the
 settings Remote rather than a custom HTTP route: it is already authenticated,
 already carries a revision, and already pushes changes to the page.
+
+An action (Test/Upload/Pull) writes the pending configuration and secret edits in
+the *same* mutate as `command`, so the Host never reads an older value than the one
+the page is showing. If the Host never answers, the page times out locally, unlocks
+the actions and reports the wait; a late answer still renders.
 
 Two failure modes are handled explicitly, and both have tests:
 

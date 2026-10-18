@@ -48,7 +48,7 @@ services, and an `llm-pi-ai` (or compatible) model adapter row.
 
 ## Configure
 
-**Settings → Model Key Sync → Cloud**.
+**Settings → Model Key Sync**. Cloud sync is the page; a read-only summary of this machine — display name, API endpoint and model count — sits below it.
 
 ### WebDAV
 
@@ -66,32 +66,33 @@ services, and an `llm-pi-ai` (or compatible) model adapter row.
 R2, OSS, B2, MinIO and AWS all work. Fill bucket, region (`auto` for R2), endpoint
 (blank for AWS), access key id and secret.
 
-Then: **Save** → **Save credentials** → **Test connection** → **Upload to cloud**.
+Fill in the fields and press **Save** (configuration and secret save together), then **Test** → **Upload**.
 
 ### On the second machine
 
-Install the plugin, open the same tab, fill the **same** values including the sync
-group, and press **Pull from cloud**. The status card lists the credentials it
+Install the plugin, open the same page, fill the **same** values including the sync
+group, and press **Pull**. The status card lists the credentials it
 stored, for example:
 
 ```
-pulled · credentials: ACME_API_KEY, OTHER_API_KEY
+pulled
+credentials: ACME_API_KEY, OTHER_API_KEY
 ```
 
 ## Daily use
 
-- **Manual**: upload after editing models; pull before using another machine.
-- **Auto**: tick *Upload automatically after a model edit*. A pull never triggers an
+- **Manual**: upload after editing models under Settings → Models; pull before using another machine.
+- **Auto**: tick *Auto upload*. A pull never triggers an
   upload.
 - **Conflict**: nothing is overwritten silently. When both sides changed, a pull is
   refused and the message names the axis — `model routes`, `API keys`, or both. Tick
-  *Force overwrite* to take the remote, or upload to keep this device.
+  *Force* to take the remote, or upload to keep this device.
 
 ## What travels
 
 | Included | Not included |
 | --- | --- |
-| Provider routes: display name, protocol, endpoint, model catalog, key reference | Sessions, attachments, plugin sources |
+| Provider routes: display name, protocol, endpoint, model catalog, key reference, provider defaults (reasoning, input, cache, thinking budgets) | Sessions, attachments, plugin sources |
 | The API key each route's `apiKeyEnv` resolves to | Credits/quota, usage history |
 | Your choice of cloud backend and sync group | Other settings (theme, shortcuts, …) |
 
@@ -119,7 +120,7 @@ timeout, an idle timeout and a response-size cap.
   through `ctx.credentials.set` — the same seam the model adapter reads.
 - They are uploaded **unencrypted**. Treat the remote as a secret store: a private
   bucket, an application password you can revoke, no shared folders.
-- Turn off *Sync API keys too* to sync model declarations only.
+- Turn off *Sync keys* to sync model declarations only.
 - Anyone who obtains the remote can use your keys. Revoke them at the provider if
   that happens.
 - The local sync state (`~/.dsh/model-key-sync/cloud-state.json`) stores hashes, not
@@ -130,8 +131,8 @@ timeout, an idle timeout and a response-size cap.
 ```bash
 npm install
 npm test                 # node test/host.mjs && node test/client.mjs
-node test/host.mjs       # 106 checks: settings, files, command channel, keys, S3 + WebDAV
-node test/client.mjs     # 63 checks: both tabs rendered and driven in jsdom
+node test/host.mjs       # 109 checks: settings, files, command channel, keys, S3 + WebDAV
+node test/client.mjs     # 91 checks: one-page cloud sync, read-only local summary, command channel
 ```
 
 `test/host.mjs` starts a real S3-compatible server and a real WebDAV server on

@@ -121,7 +121,16 @@ console.log('\n# settings and file operations')
   const { service, state } = host({
     providers: {
       // a route with an unrelated field that a restore must not destroy
-      keep: { ...route('keep'), retryPolicy: { attempts: 5 } },
+      keep: {
+        ...route('keep'),
+        retryPolicy: { attempts: 5 },
+        defaultContextWindow: 200000,
+        defaultMaxTokens: 4096,
+        defaultInput: ['text', 'image'],
+        reasoning: { effort: 'high' },
+        cacheRetention: '1h',
+        thinkingBudgets: { high: 4096 },
+      },
       // a route that cannot travel: no catalog, no endpoint
       broken: { api: 'openai-completions', models: [] },
     },
@@ -138,6 +147,7 @@ console.log('\n# settings and file operations')
   check('export carries the model catalog', exported.routes[0].models?.[0]?.id === 'keep-1')
   check('export carries the key reference, not a key', exported.routes[0].apiKeyEnv === 'KEEP_API_KEY', exported.routes[0].apiKeyEnv)
   check('export leaves unrelated fields behind', exported.routes[0].retryPolicy === undefined)
+  check('export carries provider defaults', exported.routes[0].defaultContextWindow === 200000 && exported.routes[0].reasoning?.effort === 'high', JSON.stringify(exported.routes[0]))
 
   const text = await service.exportText()
   check('exported text parses back', JSON.parse(text.text).routes.length === 1)
@@ -152,6 +162,8 @@ console.log('\n# settings and file operations')
   const outcome = await service.restore({ path: saved.files[0] })
   check('restoring reports the route as updated', outcome.updated.includes('keep') && outcome.created.length === 0, JSON.stringify(outcome))
   check('restore keeps the unrelated retry policy', state.value.providers.keep.retryPolicy?.attempts === 5, JSON.stringify(state.value.providers.keep))
+  check('restore keeps provider defaults', state.value.providers.keep.defaultContextWindow === 200000 && state.value.providers.keep.defaultMaxTokens === 4096, JSON.stringify(state.value.providers.keep))
+  check('restore keeps reasoning and input settings', state.value.providers.keep.defaultInput?.[0] === 'text' && state.value.providers.keep.reasoning?.effort === 'high', JSON.stringify(state.value.providers.keep))
 
   // every write reports itself to the hook that drives auto-sync
   const reasons = []

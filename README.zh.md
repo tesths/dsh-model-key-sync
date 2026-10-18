@@ -42,7 +42,7 @@ provider：显示名称、端点、协议、模型清单，以及 key。
 
 ## 配置
 
-**设置 → 模型密钥同步 → 云同步**。
+**设置 → 模型密钥同步**。云同步就是这一页，本机模型以只读摘要显示在页面底部（名称、API 端点、模型数）。
 
 ### WebDAV
 
@@ -60,21 +60,22 @@ provider：显示名称、端点、协议、模型清单，以及 key。
 R2、OSS、B2、MinIO、AWS 都可。填桶名、区域（R2 用 `auto`）、Endpoint（AWS 留空）、
 Access Key ID 与 Secret。
 
-然后依次：**保存配置** → **保存密钥** → **测试连接** → **上传到云端**。
+填完后点 **保存**（配置和密钥一起保存），再 **测试连接** → **上传到云端**。
 
 ### 第二台机器
 
-装好插件，打开同一个页签，填**完全相同**的值（含同步分组），点 **从云端拉取**。
+装好插件，打开同一页，填**完全相同**的值（含同步分组），点 **从云端拉取**。
 状态卡片会列出写入的密钥，例如：
 
 ```
-pulled · 本次涉及的密钥：ACME_API_KEY、OTHER_API_KEY
+pulled
+本次涉及的密钥：ACME_API_KEY、OTHER_API_KEY
 ```
 
 ## 日常使用
 
-- **手动**：改完模型后上传；到另一台机器前先拉取。
-- **自动**：勾选「模型改动后自动上传」。拉取不会触发上传。
+- **手动**：在「设置 → 模型」改完模型后上传；到另一台机器前先拉取。
+- **自动**：勾选「自动上传」。拉取不会触发上传。
 - **冲突**：不做静默覆盖。两边都改过时，拉取会被拒绝，报错会指明是 `model routes`、
   `API keys` 还是两者。勾选「强制覆盖」取云端，或上传保留本机。
 
@@ -82,7 +83,7 @@ pulled · 本次涉及的密钥：ACME_API_KEY、OTHER_API_KEY
 
 | 会同步 | 不会同步 |
 | --- | --- |
-| provider 路由：显示名称、协议、端点、模型清单、密钥引用名 | 会话、附件、插件源码 |
+| provider 路由：显示名称、协议、端点、模型清单、密钥引用名、provider 默认值（reasoning、input、缓存、思考预算） | 会话、附件、插件源码 |
 | 每个路由 `apiKeyEnv` 指向的 key 值 | 额度/用量历史 |
 | 云端后端与同步分组的配置 | 其他设置（主题、快捷键…） |
 
@@ -105,7 +106,7 @@ pulled · 本次涉及的密钥：ACME_API_KEY、OTHER_API_KEY
 - key 只通过 `ctx.credentials.resolve` 读出、通过 `ctx.credentials.set` 写入——与模型适配器
   读的是同一个接口。
 - 上传时**不加密**。请把云端当作密钥库对待：私有桶、可吊销的应用密码、不要放在共享目录。
-- 关掉「同时同步 API 密钥」就只同步模型声明。
+- 关掉「同步密钥」就只同步模型声明。
 - 谁拿到云端谁就能用你的 key；一旦怀疑泄漏，到服务商后台重置。
 - 本地同步状态（`~/.dsh/model-key-sync/cloud-state.json`）只存哈希，不存 key。
 
@@ -114,13 +115,14 @@ pulled · 本次涉及的密钥：ACME_API_KEY、OTHER_API_KEY
 ```bash
 npm install
 npm test                 # node test/host.mjs && node test/client.mjs
-node test/host.mjs       # 106 项：设置、文件、命令通道、密钥、S3 + WebDAV
-node test/client.mjs     # 63 项：两个页签在 jsdom 中的渲染与交互
+node test/host.mjs       # 109 项：设置、文件、命令通道、密钥、S3 + WebDAV
+node test/client.mjs     # 91 项：单页云同步、只读本机摘要与命令通道
 ```
 
 `test/host.mjs` 会在回环地址起真实的 S3 兼容服务器和 WebDAV 服务器，驱动两个模拟设备走完
 上传、拉取、幂等、冲突拒绝与强制覆盖。`test/client.mjs` 把真实客户端 bundle 加载进 jsdom，
-配上一份忠实的 `configForms`/`locale`/`slots` 契约。
+覆盖单页布局、三个云同步选项、本机只读摘要和导入导出，并配上一份忠实的
+`configForms`/`locale`/`slots` 契约。
 
 页面为什么要用现在这种方式和 Host 通信，见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；
 改动那条通道前请先读 [CONTRIBUTING.md](CONTRIBUTING.md)。
