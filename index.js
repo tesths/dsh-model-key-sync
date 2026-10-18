@@ -121,31 +121,31 @@ const SECRET_FIELDS = ['s3SecretAccessKey', 'webdavPassword', 's3AccessKeyId']
  */
 function buildConfig(z) {
   const configShape = {
-    llmEntryId: z.string().default('llm-pi-ai').description('Loader entry id of the model adapter whose providers this plugin edits.'),
-    syncDirectory: z.string().default('~/dsh-model-key-sync').description('Where local snapshot files are written.'),
-    keepPerProvider: z.natural().default(20).description('How many local snapshot files to keep per provider route.'),
-    includeHeaders: z.boolean().default(false).description('Copy provider `headers` into snapshots. Sensitive names stay filtered out.'),
+    llmEntryId: z.string().default('llm-pi-ai').volatile().description('Loader entry id of the model adapter whose providers this plugin edits.'),
+    syncDirectory: z.string().default('~/dsh-model-key-sync').volatile().description('Where local snapshot files are written.'),
+    keepPerProvider: z.natural().default(20).volatile().description('How many local snapshot files to keep per provider route.'),
+    includeHeaders: z.boolean().default(false).volatile().description('Copy provider `headers` into snapshots. Sensitive names stay filtered out.'),
 
-  autoSync: z.boolean().default(false).description('Upload automatically after a model edit. A pull never triggers an upload.'),
+  autoSync: z.boolean().default(false).volatile().description('Upload automatically after a model edit. A pull never triggers an upload.'),
 
-  syncCredentials: z.boolean().default(true).description('Upload the API keys behind each route and store them on pull. The keys are stored in the remote as plaintext, so anyone with access to that remote can read them.'),
+  syncCredentials: z.boolean().default(true).volatile().description('Upload the API keys behind each route and store them on pull. The keys are stored in the remote as plaintext, so anyone with access to that remote can read them.'),
 
-    backend: z.union([z.const(''), z.const('s3'), z.const('webdav')]).default('').description('Cloud backend. Empty keeps cloud sync off.'),
-    remoteRoot: z.string().default('dsh-model-key-sync').description('Remote directory that holds the snapshots.'),
-    profile: z.string().default('default').description('Remote subdirectory, one per machine group.'),
+    backend: z.union([z.const(''), z.const('s3'), z.const('webdav')]).default('').volatile().description('Cloud backend. Empty keeps cloud sync off.'),
+    remoteRoot: z.string().default('dsh-model-key-sync').volatile().description('Remote directory that holds the snapshots.'),
+    profile: z.string().default('default').volatile().description('Remote subdirectory, one per machine group.'),
 
-    s3Bucket: z.string().default('').description('S3-compatible bucket name.'),
-    s3Region: z.string().default('auto').description('Bucket region; R2 uses auto, AWS uses the real region.'),
-    s3Endpoint: z.string().default('').description('Custom endpoint such as https://<account>.r2.cloudflarestorage.com. Empty means AWS.'),
-    s3AccessKeyId: z.string().default('').description('Access key id.'),
-    s3SecretAccessKey: z.string().role('secret').default('').description('Secret access key.'),
-    s3AccessKeyIdEnv: z.string().default('S3_ACCESS_KEY_ID').description('Environment variable to read the access key id from when the field above is empty.'),
-    s3SecretAccessKeyEnv: z.string().default('S3_SECRET_ACCESS_KEY').description('Environment variable to read the secret access key from.'),
+    s3Bucket: z.string().default('').volatile().description('S3-compatible bucket name.'),
+    s3Region: z.string().default('auto').volatile().description('Bucket region; R2 uses auto, AWS uses the real region.'),
+    s3Endpoint: z.string().default('').volatile().description('Custom endpoint such as https://<account>.r2.cloudflarestorage.com. Empty means AWS.'),
+    s3AccessKeyId: z.string().default('').volatile().description('Access key id.'),
+    s3SecretAccessKey: z.string().role('secret').default('').volatile().description('Secret access key.'),
+    s3AccessKeyIdEnv: z.string().default('S3_ACCESS_KEY_ID').volatile().description('Environment variable to read the access key id from when the field above is empty.'),
+    s3SecretAccessKeyEnv: z.string().default('S3_SECRET_ACCESS_KEY').volatile().description('Environment variable to read the secret access key from.'),
 
-    webdavBaseURL: z.string().default('').description('WebDAV collection URL.'),
-    webdavUsername: z.string().default('').description('WebDAV user name.'),
-    webdavPassword: z.string().role('secret').default('').description('WebDAV password.'),
-    webdavPasswordEnv: z.string().default('WEBDAV_PASSWORD').description('Environment variable to read the WebDAV password from.'),
+    webdavBaseURL: z.string().default('').volatile().description('WebDAV collection URL.'),
+    webdavUsername: z.string().default('').volatile().description('WebDAV user name.'),
+    webdavPassword: z.string().role('secret').default('').volatile().description('WebDAV password.'),
+    webdavPasswordEnv: z.string().default('WEBDAV_PASSWORD').volatile().description('Environment variable to read the WebDAV password from.'),
 
     command: z.string().default('').volatile().description('Pending action posted by the settings page as a JSON string; the Host performs it and answers through `status`.'),
     status: z.string().default('').volatile().description('Outcome of the last action as a JSON string, written by the Host.'),
@@ -436,7 +436,12 @@ function nonJsonPath(value, path = '') {
  * @returns {string} the namespace (profile entry id).
  */
 function namespaceOf(settings, config) {
-  const ns = String(config.llmEntryId ?? 'llm-pi-ai')
+  // `config` is the schemastery row, whose fields are live refs (`{ get() }`)
+  // rather than plain strings; unwrapping here is what lets every caller pass
+  // `this.config` and still get the entry id the profile actually uses.
+  const raw = config?.llmEntryId
+  const entryId = raw !== null && typeof raw === 'object' && typeof raw.get === 'function' ? raw.get() : raw
+  const ns = String(entryId ?? 'llm-pi-ai')
   const served = settings.describe()
   if (!served.some((entry) => String(entry.ns) === ns)) {
     throw new Error(`settings namespace "${ns}" is not served here; set this plugin's config.llmEntryId to the profile entry id of the llm-pi-ai row`)
@@ -1213,9 +1218,17 @@ export function apply(ctx, config) {
     const stop = ctx.on('settings/document-updated', (ns) => {
       const own = service.settingsNamespace()
       if (own === undefined || String(ns) !== own) return
-      service.consumeCommand().catch((error) => {
+      // `settings/document-updated` is emitted from inside the settings editor's
+      // HMR transaction. Writing `status` back synchronously would nest a second
+      // transaction ("HMR transactions cannot be nested"), and an async hop does
+      // not escape it either because the transaction is tracked with
+      // AsyncLocalStorage. Leave that context explicitly before consuming.
+      const run = () => service.consumeCommand().catch((error) => {
         ctx.logger?.warn?.('model-sync: command failed: %s', error instanceof Error ? error.message : String(error))
       })
+      const hmr = ctx.get('hmr')
+      if (hmr?.executing !== undefined) hmr.executing.exit(run)
+      else setTimeout(run, 0)
     })
     return () => {
       if (typeof stop === 'function') stop()

@@ -35,9 +35,13 @@ const CONFLICT = 'cloud/conflict'
  * @returns {string} the credential, or the empty string when neither is set.
  */
 export function credentialOf({ literal, slot }) {
+  // A literal is what the user typed in the settings page: use it as-is even
+  // when it happens to look like an environment variable name (an access key
+  // such as `AKIATEST` would otherwise be looked up in `process.env` and lost).
+  // Only an empty literal falls back to the environment slot.
   const direct = typeof literal === 'string' ? literal.trim() : ''
-  if (direct.length > 0 && !/^[A-Z_][A-Z0-9_]*$/.test(direct)) return direct
-  const name = direct.length > 0 ? direct : (typeof slot === 'string' ? slot.trim() : '')
+  if (direct.length > 0) return direct
+  const name = typeof slot === 'string' ? slot.trim() : ''
   if (name.length === 0) return ''
   return (process.env[name] ?? '').trim()
 }
@@ -123,7 +127,7 @@ export class CloudSync {
       s3Bucket: String(config.s3Bucket ?? ''),
       s3Region: String(config.s3Region ?? 'auto'),
       s3Endpoint: String(config.s3Endpoint ?? ''),
-      s3AccessKeyId: credentialOf({ literal: config.s3AccessKeyIdEnv, slot: '' }),
+      s3AccessKeyId: credentialOf({ literal: config.s3AccessKeyId, slot: config.s3AccessKeyIdEnv }),
       s3SecretAccessKey: credentialOf({ literal: config.s3SecretAccessKey, slot: config.s3SecretAccessKeyEnv }),
       webdavBaseURL: String(config.webdavBaseURL ?? ''),
       webdavUsername: String(config.webdavUsername ?? ''),

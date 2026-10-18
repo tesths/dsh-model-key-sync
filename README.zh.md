@@ -115,7 +115,7 @@ pulled
 ```bash
 npm install
 npm test                 # node test/host.mjs && node test/client.mjs
-node test/host.mjs       # 109 项：设置、文件、命令通道、密钥、S3 + WebDAV
+node test/host.mjs       # 116 项：设置、文件、命令通道、密钥、S3 + WebDAV
 node test/client.mjs     # 91 项：单页云同步、只读本机摘要与命令通道
 ```
 

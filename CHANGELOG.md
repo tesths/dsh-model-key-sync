@@ -39,6 +39,20 @@
   two settings namespaces is served.
 - The read-only notice is shown once, and the local summary warns when a route with
   no endpoint or no models will be skipped by Export.
+- **Cloud settings are writable in a real deployment.** Every config field is
+  `volatile`; the settings service rejects any other field, which previously made
+  the whole cloud panel read-only with a generic "configuration rejected" message.
+- **Actions complete instead of hanging.** A command is consumed from inside the
+  settings editor's HMR transaction, so writing `status` back raised "HMR
+  transactions cannot be nested" and the page stayed on "working…". The handler
+  now leaves that `AsyncLocalStorage` context explicitly.
+- **`llmEntryId` is read from the schemastery row.** It arrived as a live `{ get }`
+  reference, so every action failed with `namespace "[object Object]" is not served
+  here`; the value is unwrapped like the other row fields.
+- **S3 access keys resolving to nothing.** The transport read the environment
+  *variable name* instead of the key itself, and an all-caps literal such as
+  `AKIATEST` was mistaken for a variable name and looked up in `process.env`. Both
+  paths now use the typed value, falling back to the environment only when empty.
 
 ## 1.1.0
 

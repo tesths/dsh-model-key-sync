@@ -10,7 +10,7 @@
  *
  * Run with: node test/host.mjs
  */
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, readFile, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -19,6 +19,7 @@ import { join } from 'node:path'
 
 const require = createRequire(import.meta.url)
 const mod = await import(new URL('../index.js', import.meta.url).href)
+const { credentialOf } = await import(new URL('../cloud/sync.js', import.meta.url).href)
 
 let passed = 0
 const failures = []
@@ -32,6 +33,43 @@ function check(label, condition, detail) {
   }
   failures.push(label)
   console.log(`  FAIL ${label}${detail === undefined ? '' : ` — ${String(detail).slice(0, 240)}`}`)
+}
+
+/* ------------------------------------------------------------------ */
+/* Credential literals versus environment slots.                       */
+/* ------------------------------------------------------------------ */
+
+console.log('\n# credential resolution')
+{
+  process.env.MODEL_SYNC_TEST_KEY = 'from-environment'
+  // An access key is often all-caps (AWS style); it is a literal value, not a
+  // variable name, and must never be looked up in the environment.
+  check('an all-caps literal is used as-is', credentialOf({ literal: 'AKIATEST', slot: 'MODEL_SYNC_TEST_KEY' }) === 'AKIATEST', credentialOf({ literal: 'AKIATEST', slot: 'MODEL_SYNC_TEST_KEY' }))
+  check('an empty literal falls back to the environment slot', credentialOf({ literal: '', slot: 'MODEL_SYNC_TEST_KEY' }) === 'from-environment', credentialOf({ literal: '', slot: 'MODEL_SYNC_TEST_KEY' }))
+  check('no literal and no slot resolves to empty', credentialOf({ literal: '', slot: '' }) === '')
+}
+
+/* ------------------------------------------------------------------ */
+/* Every settings field must be volatile.                              */
+/* ------------------------------------------------------------------ */
+
+{
+  // The settings service refuses to write a non-volatile field, which makes the
+  // whole cloud panel read-only in a real deployment. The schema is only built
+  // when schemastery is locatable, so assert on the source instead of skipping.
+  const source = await readFile(new URL('../index.js', import.meta.url), 'utf8')
+  const body = source.slice(source.indexOf('function buildConfig(z)'), source.indexOf('export const Config'))
+  const fieldLines = body.split('\n').filter((line) => /^\s{4}\w+: z\./.test(line))
+  const missing = fieldLines.filter((line) => !line.includes('.volatile()'))
+  check('the schema declares fields', fieldLines.length >= 20, String(fieldLines.length))
+  check('every settings field is volatile', missing.length === 0, missing.map((l) => l.trim().slice(0, 40)).join(' | '))
+  // The command is consumed from a settings event raised inside the HMR
+  // transaction; writing the status back from there throws "HMR transactions
+  // cannot be nested". The handler must leave that AsyncLocalStorage context.
+  check('the command channel leaves the HMR context', /hmr\.executing\.exit|setTimeout\(run/.test(source), 'no escape found')
+  // `this.config` is the schemastery row, so its fields are `{ get() }` refs;
+  // reading one as a string yields "[object Object]" and every action fails.
+  check('namespaceOf unwraps schemastery refs', /typeof raw\.get === 'function'/.test(source), 'no unwrap found')
 }
 
 /* ------------------------------------------------------------------ */

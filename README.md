@@ -131,7 +131,7 @@ timeout, an idle timeout and a response-size cap.
 ```bash
 npm install
 npm test                 # node test/host.mjs && node test/client.mjs
-node test/host.mjs       # 109 checks: settings, files, command channel, keys, S3 + WebDAV
+node test/host.mjs       # 116 checks: settings, files, command channel, keys, S3 + WebDAV
 node test/client.mjs     # 91 checks: one-page cloud sync, read-only local summary, command channel
 ```
 
