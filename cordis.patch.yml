@@ -1,0 +1,27 @@
+- insert:
+    - id: model-key-sync
+      name: 'dsh-model-key-sync'
+      config:
+        llmEntryId: llm-pi-ai
+        syncDirectory: ~/dsh-model-key-sync
+        keepPerProvider: 20
+        includeHeaders: false
+        # Upload the API keys behind each route. Keys are stored in the remote as
+        # plaintext; set false to sync model declarations only.
+        syncCredentials: true
+        # Cloud transfer. Leave `backend` empty to keep cloud sync off; the
+        # `model_key_sync` tool then reports only the local state.
+        backend: ''
+        # Upload after each model edit. A pull never triggers an upload.
+        autoSync: false
+        remoteRoot: dsh-model-key-sync
+        profile: default
+        s3Bucket: ''
+        s3Region: auto
+        s3Endpoint: ''
+        s3AccessKeyId: ''
+        s3AccessKeyIdEnv: S3_ACCESS_KEY_ID
+        s3SecretAccessKeyEnv: S3_SECRET_ACCESS_KEY
+        webdavBaseURL: ''
+        webdavUsername: ''
+        webdavPasswordEnv: WEBDAV_PASSWORD

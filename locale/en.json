@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Model Key Sync",
+    "description": "Upload model configuration and third-party API keys, then pull them on another machine — over S3-compatible storage or WebDAV."
+  }
+}
